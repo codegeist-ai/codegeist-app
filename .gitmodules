@@ -1,0 +1,8 @@
+[submodule ".devcontainer"]
+	path = .devcontainer
+	url = https://github.com/codegeist-ai/codegeist-devcontainer-kit.git
+	branch = release
+[submodule ".opencode"]
+	path = .opencode
+	url = https://github.com/codegeist-ai/codegeist-agent-kit.git
+	branch = release
