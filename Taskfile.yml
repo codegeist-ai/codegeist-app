@@ -1,4 +1,4 @@
-# Taskfile.yml - developer entrypoints for the minimal Flutter Android app
+# Taskfile.yml - developer entrypoints for the local Flutter Android app
 #
 # The Flutter tasks call the pinned toolchain from .codegeist/Dockerfile. Android
 # lifecycle behavior remains in scripts/android-avd.sh, while runtime assertions
@@ -29,7 +29,7 @@ tasks:
     desc: Build the Android debug APK
     deps: [_pub-get]
     cmds:
-      - flutter build apk --debug
+      - flutter build apk --debug --target-platform android-arm64,android-x64
 
   verify:
     desc: Run all static, test, and build checks

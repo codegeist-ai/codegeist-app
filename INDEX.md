@@ -20,8 +20,12 @@ implementation tasks.
   extension for the shared devcontainer image.
 - `Taskfile.yml` - named Flutter verification and Android AVD entrypoints.
 - `pubspec.yaml` - Flutter package metadata and dependencies.
-- `lib/main.dart` - Codegeist start screen and runtime entrypoint.
-- `test/widget_test.dart` - regression contract for the start screen.
+- `assets/brand/` - approved app-local Codegeist logo and its pinned design
+  provenance record.
+- `lib/main.dart` - pinned model loader, local inference chat, and runtime
+  entrypoint.
+- `test/widget_test.dart` - lightweight regression contract for the model-load
+  screen.
 - `android/` - generated Android platform project for `ai.codegeist.app`.
 - `scripts/android-avd.sh` - KVM AVD creation, boot, APK installation, launch,
   process verification, and visible scrcpy mirroring.
@@ -52,6 +56,8 @@ implementation tasks.
   Android screen mirroring.
 - Review `docs/tasks/T004_add_android_smoke_test.md` for runtime smoke checks and
   local MP4 capture.
+- Review `docs/tasks/T005_build_minimal_local_codegeist_chat.md` for the pinned
+  model download and minimal local Android chat contract.
 
 ## Update Triggers
 

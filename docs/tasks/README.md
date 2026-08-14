@@ -22,3 +22,5 @@ This directory stores focused implementation tasks for Codegeist App.
   through scrcpy instead of the native emulator window.
 - `T004_add_android_smoke_test.md` - verify the running Android app and record a
   local MP4 of its launch.
+- `T005_build_minimal_local_codegeist_chat.md` - download the pinned Codegeist
+  GGUF and provide a minimal local CPU chat on Android.

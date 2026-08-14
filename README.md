@@ -1,16 +1,41 @@
 # Codegeist App
 
-Codegeist App is an Android client for future private, local Codegeist model
-inference.
+Codegeist App is an Android client for private, local Codegeist model inference.
 
 ## Current State
 
-The repository contains a minimal Android-only Flutter application. Its start
-screen displays `codegeist` and the project establishes the build, test, and
-Android Virtual Device (AVD) baseline. Model download, inference, persistence,
-networking, and further product UI are not implemented.
+The repository contains a minimal Android-only Flutter chat application. Its
+start screen displays the reviewed Codegeist horizontal logo and an explicit
+model-load action. The first load downloads and verifies the pinned 1.11 GB
+Codegeist GGUF in application-private storage; later loads reuse that file. Once
+loaded, the app runs a single in-memory, CPU-only conversation and streams model
+responses into the chat surface.
 
-![Codegeist App launching in Android](docs/assets/codegeist-smoke.gif)
+Conversation persistence, multiple chats, remote inference, model selection,
+Vulkan, tools, attachments, and background inference are not implemented.
+
+![Codegeist App loading its local model and running an Android chat](docs/assets/codegeist-smoke.gif)
+
+## Local Model
+
+Press `Load model` in the application to download and start the model. The app
+uses `codegeist/codegeist-llm` file
+`gguf/codegeist-llm-Q4_K_M.gguf` from immutable revision
+`ce073afd34b725825b19089cec1a9e7b884b2fbe` and rejects bytes that do not match
+SHA-256
+`be7824de2fc34955d640e30e41e92dd66206e86ab7fe027084015a9b7da44fce`.
+Interrupted downloads can resume. Clearing application data or uninstalling the
+app removes the cached model.
+
+Inference uses llama.cpp on CPU with a 2048-token context and responses capped
+at 256 generated tokens. A 64-bit Android device with at least 4 GB RAM and
+approximately 2 GB free application storage is recommended. The current model
+is an experimental identity artifact; its publication does not establish broad
+chat or coding quality.
+
+The repository build and Android launch workflows package only `arm64-v8a` and
+`x86_64`, matching the available llama.cpp runtime bundles. Model weights are
+never included in the APK.
 
 ## Toolchain
 
@@ -97,8 +122,9 @@ task smoke
 ```
 
 The smoke test builds and launches the app, then verifies the ADB device, app
-process, resumed `MainActivity`, and Android UI semantics for `codegeist`. To run
-the same checks and record the app restart within a six-second capture window:
+process, resumed `MainActivity`, and Android UI semantics for the Codegeist logo
+and `Load model` action. It does not start the model download. To run the same
+checks and record the app restart within a six-second capture window:
 
 ```bash
 task smoke:record
@@ -138,3 +164,7 @@ edit the shared submodule contents for application requirements.
 Codegeist-authored source and documentation in this repository are licensed
 under the [Zero-Clause BSD License](LICENSE). Future third-party runtimes and
 model artifacts retain their own licenses and notice requirements.
+
+The Codegeist logo under `assets/brand/` is Codegeist-controlled brand material,
+not 0BSD software. Its app-local public-use approval, canonical design revision,
+and integrity digest are recorded in `assets/brand/README.md`.

@@ -23,6 +23,7 @@
 # - .devcontainer/.env
 # - README.md
 # - android/app/build.gradle.kts
+# - docs/tasks/T005_build_minimal_local_codegeist_chat.md
 set -euo pipefail
 
 readonly MODE="${1:-headless}"
@@ -249,7 +250,7 @@ done
 log info emulator_start "status=completed serial=$SERIAL"
 
 log info apk_build "status=started mode=debug"
-flutter build apk --debug >&2
+flutter build apk --debug --target-platform android-arm64,android-x64 >&2
 [ -f "$APK_PATH" ] || fail "apk_missing path=$APK_PATH"
 log info apk_build "status=completed path=$APK_PATH"
 

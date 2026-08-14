@@ -20,6 +20,7 @@
 # - scripts/android-avd.sh
 # - Taskfile.yml
 # - docs/tasks/T004_add_android_smoke_test.md
+# - docs/tasks/T005_build_minimal_local_codegeist_chat.md
 set -euo pipefail
 
 readonly ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -82,8 +83,11 @@ assert_runtime_contract() {
   printf '%s\n' "$ui_dump" \
     | grep -Fq 'content-desc="codegeist"' \
     || fail "start_text_missing serial=$SERIAL expected=codegeist"
+  printf '%s\n' "$ui_dump" \
+    | grep -Fq 'content-desc="Load model"' \
+    || fail "model_action_missing serial=$SERIAL expected=Load_model"
 
-  log info smoke_check "status=completed serial=$SERIAL package=$PACKAGE_ID pid=$app_pid text=codegeist"
+  log info smoke_check "status=completed serial=$SERIAL package=$PACKAGE_ID pid=$app_pid text=codegeist action=load_model"
 }
 
 if [ "$#" -gt 1 ]; then
