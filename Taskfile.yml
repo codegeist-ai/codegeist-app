@@ -1,0 +1,65 @@
+# Taskfile.yml - developer entrypoints for the minimal Flutter Android app
+#
+# The Flutter tasks call the pinned toolchain from .codegeist/Dockerfile. Android
+# lifecycle behavior remains in scripts/android-avd.sh, while runtime assertions
+# and recording remain in scripts/android-smoke.sh. This file only groups and
+# names the repository's established commands.
+version: '3'
+
+tasks:
+  _pub-get:
+    internal: true
+    run: once
+    cmds:
+      - flutter pub get
+
+  analyze:
+    desc: Run Flutter static analysis
+    deps: [_pub-get]
+    cmds:
+      - flutter analyze
+
+  test:
+    desc: Run Flutter widget tests
+    deps: [_pub-get]
+    cmds:
+      - flutter test
+
+  build:
+    desc: Build the Android debug APK
+    deps: [_pub-get]
+    cmds:
+      - flutter build apk --debug
+
+  verify:
+    desc: Run all static, test, and build checks
+    cmds:
+      - bash -n scripts/android-avd.sh scripts/android-smoke.sh
+      - task: analyze
+      - task: test
+      - task: build
+      - git --no-pager diff HEAD --check
+
+  android:
+    desc: Build and launch the app in the headless AVD
+    silent: true
+    cmds:
+      - scripts/android-avd.sh headless
+
+  android:visible:
+    desc: Build, launch, and mirror the app through scrcpy
+    silent: true
+    cmds:
+      - scripts/android-avd.sh visible
+
+  smoke:
+    desc: Run the Android application smoke test
+    silent: true
+    cmds:
+      - scripts/android-smoke.sh
+
+  smoke:record:
+    desc: Run the Android smoke test and record its app launch
+    silent: true
+    cmds:
+      - scripts/android-smoke.sh --record

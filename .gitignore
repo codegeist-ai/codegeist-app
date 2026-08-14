@@ -3,3 +3,17 @@
 /.oc_local/
 /.worktrees/
 /.chrome/
+/.oc_local/.gitignore
+
+# Flutter, Dart, and Android build state.
+*.iml
+/.dart_tool/
+/.flutter-plugins-dependencies
+/.idea/
+/.pub-cache/
+/build/
+/coverage/
+/.widget_preview/
+
+# Generated smoke-test captures and other local review artifacts.
+/.artifacts/
