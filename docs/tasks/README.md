@@ -24,3 +24,5 @@ This directory stores focused implementation tasks for Codegeist App.
   local MP4 of its launch.
 - `T005_build_minimal_local_codegeist_chat.md` - download the pinned Codegeist
   GGUF and provide a minimal local CPU chat on Android.
+- `T006_distribute_android_apks_directly.md` - publish the current signed APK
+  through GitHub and preserve a local release build path for recovery.

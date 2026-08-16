@@ -18,14 +18,17 @@ implementation tasks.
 - `.opencode/` - shared OpenCode agent kit on its `release` branch.
 - `.codegeist/Dockerfile` - pinned Flutter, JDK, Android SDK, and scrcpy
   extension for the shared devcontainer image.
-- `Taskfile.yml` - named Flutter verification and Android AVD entrypoints.
+- `.github/workflows/android-release-apk.yml` - manually signs and publishes the
+  current universal release APK at one stable direct-download URL.
+- `Taskfile.yml` - named Flutter verification, local signed release APK, and
+  Android AVD entrypoints.
 - `pubspec.yaml` - Flutter package metadata and dependencies.
 - `assets/brand/` - approved app-local Codegeist logo and its pinned design
   provenance record.
 - `lib/main.dart` - pinned model loader, local inference chat, and runtime
   entrypoint.
 - `test/widget_test.dart` - lightweight regression contract for the model-load
-  screen.
+  screen and Alpha Preview disclosure.
 - `android/` - generated Android platform project for `ai.codegeist.app`.
 - `scripts/android-avd.sh` - KVM AVD creation, boot, APK installation, launch,
   process verification, and visible scrcpy mirroring.
@@ -33,6 +36,10 @@ implementation tasks.
   smoke-test contract.
 - `docs/assets/codegeist-smoke.gif` - compact README preview derived from the
   smoke-test recording's meaningful launch frames.
+- `docs/github-release-apk.md` - protected GitHub release build, direct download,
+  verification, sideload, and stable-update contract.
+- `docs/android-release-apk.md` - local release-key generation, signing,
+  verification, installation, and stable direct-update contract.
 - `docs/tasks/` - scoped application task specifications and their template.
 
 ## Known Directory Indexes
@@ -46,6 +53,10 @@ implementation tasks.
 - Rebuild the project devcontainer after `.codegeist/Dockerfile` changes.
 - Run `task verify` inside the rebuilt devcontainer for analysis, tests, and the
   debug APK build.
+- Run `task apk` with the documented `ANDROID_RELEASE_*` environment to create
+  one universal ARM64/x86_64 release APK for stable direct installation.
+- Manually run **Android release APK** from `main` to publish a versioned Release
+  and replace the stable **Latest** direct-download target.
 - Run `task android` for the headless Android baseline or
   `task android:visible` when the devcontainer has a usable X11 transport.
 - Review `docs/tasks/T001_bootstrap_minimal_flutter_android_app.md` for the
@@ -58,6 +69,9 @@ implementation tasks.
   local MP4 capture.
 - Review `docs/tasks/T005_build_minimal_local_codegeist_chat.md` for the pinned
   model download and minimal local Android chat contract.
+- Review
+  `docs/tasks/T006_distribute_android_apks_directly.md` for protected GitHub and
+  local release signing, direct APK distribution, and the Alpha disclosure.
 
 ## Update Triggers
 

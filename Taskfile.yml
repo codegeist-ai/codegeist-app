@@ -10,6 +10,12 @@ tasks:
   _pub-get:
     internal: true
     run: once
+    # Dependency resolution and package hooks never need release credentials.
+    env:
+      ANDROID_RELEASE_KEYSTORE_PATH: ''
+      ANDROID_RELEASE_KEYSTORE_PASSWORD: ''
+      ANDROID_RELEASE_KEY_PASSWORD: ''
+      ANDROID_RELEASE_KEY_ALIAS: ''
     cmds:
       - flutter pub get
 
@@ -29,7 +35,13 @@ tasks:
     desc: Build the Android debug APK
     deps: [_pub-get]
     cmds:
-      - flutter build apk --debug --target-platform android-arm64,android-x64
+      - flutter build apk --debug --no-pub --target-platform android-arm64,android-x64
+
+  apk:
+    desc: Build the locally signed universal Android release APK
+    deps: [_pub-get]
+    cmds:
+      - flutter build apk --release --no-pub --target-platform android-arm64,android-x64
 
   verify:
     desc: Run all static, test, and build checks

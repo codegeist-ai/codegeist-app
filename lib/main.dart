@@ -17,13 +17,15 @@ void main() {
 }
 
 class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+  const MainApp({super.key, this.modelLoadOverride});
+
+  final Future<void> Function()? modelLoadOverride;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const _ChatPage(),
+      home: _ChatPage(modelLoadOverride: modelLoadOverride),
     );
   }
 }
@@ -33,7 +35,9 @@ class MainApp extends StatelessWidget {
 /// No platform or network work starts until the user requests the model, which
 /// keeps normal launch, widget tests, and the Android smoke test lightweight.
 class _ChatPage extends StatefulWidget {
-  const _ChatPage();
+  const _ChatPage({this.modelLoadOverride});
+
+  final Future<void> Function()? modelLoadOverride;
 
   @override
   State<_ChatPage> createState() => _ChatPageState();
@@ -51,6 +55,51 @@ class _ChatPageState extends State<_ChatPage> {
   bool _isGenerating = false;
   int? _downloadPercent;
   String? _error;
+
+  /// Requires an explicit Alpha Preview acknowledgement before any model work.
+  ///
+  /// The optional callback keeps widget tests independent of platform channels,
+  /// network access, and native inference libraries. Normal app builds always
+  /// use the real model loader.
+  Future<void> _requestModelLoad() async {
+    if (_isLoading || _engine != null) return;
+
+    final approved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        scrollable: true,
+        title: const Text('Codegeist Alpha Preview'),
+        content: const Text(
+          'Codegeist uses a small experimental model that runs locally on this '
+          'device. It can produce inaccurate, incomplete, unsafe, or offensive '
+          'text.\n\n'
+          'The first load downloads approximately 1.11 GB. Your prompts and '
+          'generated responses stay on this device.\n\n'
+          'Do not rely on its output as professional, legal, medical, financial, '
+          'security, or other expert advice.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || approved != true) return;
+
+    final override = widget.modelLoadOverride;
+    if (override != null) {
+      await override();
+      return;
+    }
+    await _loadModel();
+  }
 
   /// Resolves the immutable GGUF into private storage, verifies it, and starts
   /// a CPU-only inference session. Failed attempts dispose their native state
@@ -254,7 +303,7 @@ class _ChatPageState extends State<_ChatPage> {
               const SizedBox(height: 28),
               FilledButton(
                 key: const Key('load-model'),
-                onPressed: _loadModel,
+                onPressed: _requestModelLoad,
                 child: Text(_error == null ? 'Load model' : 'Try again'),
               ),
             ],

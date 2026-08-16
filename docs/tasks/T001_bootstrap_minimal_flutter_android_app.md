@@ -54,7 +54,7 @@ whether the basic build and emulator path works.
 - Codegeist model download, loading, or inference.
 - Network access, persistence, settings, permissions, telemetry, or analytics.
 - Product UI, themes, assets, localization, navigation, or state management.
-- Release signing, Play Store packaging, or production deployment.
+- Release signing, store packaging, or production deployment.
 - iOS, web, desktop, or embedded Flutter targets.
 - Physical Android-device support.
 - Modification of the shared `.devcontainer` or `.opencode` submodule contents.

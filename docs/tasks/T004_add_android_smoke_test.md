@@ -115,9 +115,7 @@ inspection, and the stdout contract checks. The refreshed H.264 MP4 is 1080 by
 2400 pixels, 5.105 seconds long, and 426545 bytes. Captured frames show the
 Flutter launch screen followed by the Codegeist local model-load screen.
 
-The README GIF now shows the model-download prompt, cached-model preparation,
-loaded chat, prompt entry and submission, and the verified assistant response.
-It uses a palette-optimized 8 FPS conversion at 320 by 711 pixels, contains 101
-frames, loops after 12.62 seconds, and is 160463 bytes. Source MP4s and
-inspection frames remain ignored while the curated derivative is committed
-under `docs/assets/`.
+T006 later refreshed the README GIF again to include the Alpha disclosure and a
+shorter transition into prompt entry; its implementation notes carry the current
+derivative metadata. Source MP4s and inspection frames remain ignored while the
+curated GIF stays committed under `docs/assets/`.

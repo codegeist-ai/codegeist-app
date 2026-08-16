@@ -1,7 +1,33 @@
+// Android application build and environment-provided release signing for T006.
+// Debug workflows require no secrets; requested release tasks fail rather than
+// producing an unsigned or debug-signed artifact when local credentials are absent.
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val releaseSigningEnvironment =
+    listOf(
+        "ANDROID_RELEASE_KEYSTORE_PATH",
+        "ANDROID_RELEASE_KEYSTORE_PASSWORD",
+        "ANDROID_RELEASE_KEY_PASSWORD",
+        "ANDROID_RELEASE_KEY_ALIAS",
+    )
+val releaseSigningValues =
+    releaseSigningEnvironment.associateWith { name ->
+        providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
+    }
+gradle.taskGraph.whenReady {
+    if (allTasks.any { task -> task.name.contains("release", ignoreCase = true) }) {
+        val missingValues = releaseSigningEnvironment.filter { releaseSigningValues[it] == null }
+        check(missingValues.isEmpty()) {
+            "Release signing requires environment variables: ${missingValues.joinToString()}"
+        }
+        check(file(releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PATH")!!).isFile) {
+            "Release signing keystore does not exist at ANDROID_RELEASE_KEYSTORE_PATH"
+        }
+    }
 }
 
 android {
@@ -18,7 +44,8 @@ android {
         applicationId = "ai.codegeist.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Direct-distribution baseline: Android 13 (API 33) or newer.
+        minSdk = 33
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -28,11 +55,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningEnvironment.all { releaseSigningValues[it] != null }) {
+            create("release") {
+                storeFile = file(releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PATH")!!)
+                storePassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEYSTORE_PASSWORD")
+                keyPassword = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_PASSWORD")
+                keyAlias = releaseSigningValues.getValue("ANDROID_RELEASE_KEY_ALIAS")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 }

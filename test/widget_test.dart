@@ -24,4 +24,77 @@ void main() {
     expect(find.byType(Icon), findsNothing);
     expect(find.byType(CheckedModeBanner), findsNothing);
   });
+
+  testWidgets('shows the Alpha Preview disclosure before model loading', (
+    tester,
+  ) async {
+    var loadRequests = 0;
+    await tester.pumpWidget(
+      MainApp(
+        modelLoadOverride: () async {
+          loadRequests += 1;
+        },
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('load-model')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Codegeist Alpha Preview'), findsOneWidget);
+    expect(find.textContaining('small experimental model'), findsOneWidget);
+    expect(
+      find.textContaining('inaccurate, incomplete, unsafe'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('approximately 1.11 GB'), findsOneWidget);
+    expect(find.textContaining('stay on this device'), findsOneWidget);
+    expect(find.textContaining('professional, legal, medical'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Cancel'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Continue'), findsOneWidget);
+    expect(loadRequests, 0);
+  });
+
+  testWidgets('cancels the Alpha Preview without starting model loading', (
+    tester,
+  ) async {
+    var loadRequests = 0;
+    await tester.pumpWidget(
+      MainApp(
+        modelLoadOverride: () async {
+          loadRequests += 1;
+        },
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('load-model')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Codegeist Alpha Preview'), findsNothing);
+    expect(find.byKey(const Key('model-progress')), findsNothing);
+    expect(find.byKey(const Key('chat-input')), findsNothing);
+    expect(loadRequests, 0);
+  });
+
+  testWidgets('continues from the Alpha Preview into one model load request', (
+    tester,
+  ) async {
+    var loadRequests = 0;
+    await tester.pumpWidget(
+      MainApp(
+        modelLoadOverride: () async {
+          loadRequests += 1;
+        },
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('load-model')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Codegeist Alpha Preview'), findsNothing);
+    expect(loadRequests, 1);
+  });
 }

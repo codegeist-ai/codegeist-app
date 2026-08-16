@@ -11,10 +11,15 @@ Codegeist GGUF in application-private storage; later loads reuse that file. Once
 loaded, the app runs a single in-memory, CPU-only conversation and streams model
 responses into the chat surface.
 
+Each model-load request first shows an Alpha Preview disclosure covering the
+experimental model, possible unsafe or inaccurate output, local processing,
+download size, and non-professional-use boundary. Cancelling the disclosure
+starts no model work.
+
 Conversation persistence, multiple chats, remote inference, model selection,
 Vulkan, tools, attachments, and background inference are not implemented.
 
-![Codegeist App loading its local model and running an Android chat](docs/assets/codegeist-smoke.gif)
+![Codegeist App disclosing its Alpha Preview, loading its local model, and running an Android chat](docs/assets/codegeist-smoke.gif)
 
 ## Local Model
 
@@ -28,10 +33,10 @@ Interrupted downloads can resume. Clearing application data or uninstalling the
 app removes the cached model.
 
 Inference uses llama.cpp on CPU with a 2048-token context and responses capped
-at 256 generated tokens. A 64-bit Android device with at least 4 GB RAM and
-approximately 2 GB free application storage is recommended. The current model
-is an experimental identity artifact; its publication does not establish broad
-chat or coding quality.
+at 256 generated tokens. A 64-bit Android 13 (API 33) or newer device with at
+least 4 GB RAM and approximately 2 GB free application storage is recommended.
+The current model is an experimental identity artifact; its publication does
+not establish broad chat or coding quality.
 
 The repository build and Android launch workflows package only `arm64-v8a` and
 `x86_64`, matching the available llama.cpp runtime bundles. Model weights are
@@ -77,7 +82,12 @@ task verify
 ```
 
 The individual commands remain available as `task analyze`, `task test`, and
-`task build`. Run `task --list` to display all repository entrypoints.
+`task build`. After exporting the four local `ANDROID_RELEASE_*` signing values
+documented under
+[`docs/android-release-apk.md`](docs/android-release-apk.md), use `task apk` to
+build one universal ARM64/x86_64 release APK for stable direct installation.
+Release builds fail instead of falling back to the debug key when signing input
+is absent. Run `task --list` to display all repository entrypoints.
 
 Start the dedicated `codegeist_api_36` AVD without a window, install the debug
 APK, launch `ai.codegeist.app`, and verify its process:
@@ -133,6 +143,29 @@ task smoke:record
 The recording is validated with `ffprobe` and written to
 `.artifacts/codegeist-smoke.mp4`. `.artifacts/` is machine-local and ignored by
 Git.
+
+## GitHub Release APK
+
+The manually triggered **Android release APK** GitHub Actions workflow builds
+one release-signed universal ARM64/x86_64 APK from the committed `main` branch.
+It receives the signing identity only from the protected GitHub `release`
+environment. After the first successful workflow run, open the permanent public
+link below on a compatible Android device, download the APK, and approve
+Android's per-source **Install unknown apps** prompt:
+
+[`Download codegeist.apk`](https://github.com/codegeist-ai/codegeist-app/releases/latest/download/codegeist.apk)
+
+Each successful workflow run creates one versioned Release and updates the
+**Latest** redirect behind that link. It is a direct `.apk` download, not a ZIP
+or a time-limited Actions artifact.
+
+Every published version must use the same protected release key and a higher
+build number so Android can install it as an update. A previously installed
+debug-signed build must be uninstalled once before the first release-signed
+installation. See [`docs/github-release-apk.md`](docs/github-release-apk.md) for
+the public build and download path and
+[`docs/android-release-apk.md`](docs/android-release-apk.md) for release-key
+custody, local recovery builds, and direct updates.
 
 ## Hosting
 
