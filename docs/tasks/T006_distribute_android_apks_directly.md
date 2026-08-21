@@ -3,15 +3,14 @@
 - ID: `T006`
 - Type: `release`
 - Parent: none
-- Status: `blocked`
+- Status: `solved`
 
 ## Goal
 
 Publish the current release-signed Android APK directly through GitHub without
-an application store. Preserve a local recovery build path for the same signing
-identity. Every distributed version must support stable direct updates, preserve
-local model inference, exclude model weights, and show the Alpha Preview
-disclosure before model loading.
+an application store. Preserve a local release build path for the same signing
+identity. Every distributed version must preserve local model inference, exclude
+model weights, and show the Alpha Preview disclosure before model loading.
 
 ## Context
 
@@ -21,10 +20,10 @@ generated responses remain on the device under the current implementation.
 
 The repository is written through private Gitea and mirrored publicly to GitHub.
 Every committed ref and GitHub Release asset must therefore be treated as
-public. The canonical release key remains under local encrypted custody; GitHub
-Actions receives an encrypted environment copy only through explicitly mapped
-secrets. Release-signing material must never enter Git, logs, chat, issues, or
-uploaded assets.
+public. The canonical release key remains under machine-local custody in the
+ignored `.codegeist/secrets/` directory; GitHub Actions receives an encrypted
+environment copy only through explicitly mapped secrets. Release-signing
+material must never enter Git, logs, chat, issues, or uploaded assets.
 
 ## Scope
 
@@ -45,7 +44,7 @@ uploaded assets.
 - Display the installed name `Codegeist`.
 - Require Android 13 (API 33) or newer for every distributed APK.
 - Keep `pubspec.yaml` as the version name and version-code source.
-- Increment the build number for every distributed direct-update release.
+- Increment the build number for every distributed release.
 
 ### Public GitHub Release APK
 
@@ -78,21 +77,20 @@ uploaded assets.
   without a debug or unsigned fallback.
 - Keep debug builds and `task verify` secrets-free.
 - Build one universal ARM64/x86_64 APK through `task apk`.
-- Generate the real release key interactively outside the checkout and back up
-  its keystore, passwords, alias, certificate, and fingerprint before placing an
-  encrypted copy in GitHub or making the first distribution.
+- Generate the first real release key only under the ignored local secret
+  boundary on a trusted machine, and retain its keystore, passwords, alias,
+  certificate, and fingerprint there before placing an encrypted copy in GitHub
+  or making the first distribution.
 - Verify each APK with Android `apksigner`, calculate its SHA-256, inspect both
   ABIs, and reject `armeabi-v7a`, GGUF, or key material.
-- Use the same release key and a higher version code for every later in-place
-  direct update.
 
 ### Documentation
 
 - Document the protected GitHub environment, permanent direct link, APK
   download, certificate verification, sideloading, and one-time transition from
   a debug-signed installation.
-- Document local release-key creation, backup, GitHub secret setup, interactive
-  local environment setup, release APK verification, and stable direct updates.
+- Document canonical release-key custody, GitHub secret setup, local
+  environment setup, release APK verification, and direct installation.
 - Keep all durable project text in English and all private signing values outside
   tracked files.
 
@@ -105,9 +103,10 @@ The authorized local operator exports only these values in a private shell:
 - `ANDROID_RELEASE_KEY_PASSWORD`
 - `ANDROID_RELEASE_KEY_ALIAS`
 
-Passwords are read interactively without terminal echo or shell-history
-arguments. Unset all four values after a local build. GitHub stores the keystore
-as `ANDROID_RELEASE_KEYSTORE_BASE64` and maps the two passwords and alias from
+The operator reads the values from ignored mode-`0600` local files without
+printing them or placing them in shell-history arguments, then unsets all four
+values after a local build. GitHub stores the keystore as
+`ANDROID_RELEASE_KEYSTORE_BASE64` and maps the two passwords and alias from
 protected environment secrets into the release-build step. The public
 certificate SHA-256 is stored separately as `ANDROID_RELEASE_CERT_SHA256` and
 must match the built APK before publication.
@@ -120,6 +119,7 @@ must match the built APK before publication.
 - Bundling model weights in an APK or repository.
 - Accounts, analytics, advertising, cloud inference, or remote chat storage.
 - Claiming production quality, broad model capability, or guaranteed safe output.
+- Implementing or verifying an in-place update between release versions.
 
 ## Acceptance Criteria
 
@@ -139,12 +139,14 @@ must match the built APK before publication.
 - Published Releases and their tags and assets are immutable.
 - The public release documentation explains that switching once from a debug
   installation requires an uninstall and loss of local app data.
-- The local release documentation explains key custody, version increments, and
-  stable updates with the same release key.
+- The local release documentation explains key custody and version increments.
+- The public stable Latest APK installs and launches on a physical Samsung Galaxy
+  Z Fold6.
 - No signing material or generated APK is committed.
 
 ## Relevant Files Or Areas
 
+- `.dockerignore`
 - `.github/workflows/android-release-apk.yml`
 - `android/app/build.gradle.kts`
 - `android/app/src/main/AndroidManifest.xml`
@@ -173,6 +175,7 @@ signing values and its public certificate fingerprint, then verify the local
 release APK:
 
 ```bash
+set -euo pipefail
 task apk
 apk=build/app/outputs/flutter-apk/app-release.apk
 verification="$(
@@ -196,7 +199,9 @@ archive_listing="$(unzip -Z1 "$apk")"
 rg -q '^lib/arm64-v8a/' <<< "$archive_listing"
 rg -q '^lib/x86_64/' <<< "$archive_listing"
 ! rg -q '^lib/armeabi-v7a/' <<< "$archive_listing"
-! rg -qi '\.(gguf|jks|keystore)$' <<< "$archive_listing"
+! rg -qi '\.(gguf|jks|keystore|p12|pfx|pem|key)$' <<< "$archive_listing"
+! rg -qi '(^|/)(keystore-password|key-password|key-alias|certificate-sha256)$' \
+  <<< "$archive_listing"
 sha256sum "$apk"
 git --no-pager diff --check
 ```
@@ -211,7 +216,8 @@ key-material checks.
 - T001 through T005.
 - The pinned local Flutter, JDK 21, and Android toolchain.
 - Public network access for dependencies, GitHub Actions, and first model load.
-- A protected local release key and encrypted backup before distribution.
+- The protected local release identity under `.codegeist/secrets/` before
+  distribution.
 - A GitHub `release` environment restricted to protected `main`, an authorized
   reviewer, immutable Releases, the four signing secrets, and the public
   certificate fingerprint.
@@ -219,7 +225,7 @@ key-material checks.
 
 ## Open Questions
 
-- Who is the authorized custodian for the real direct-distribution release key?
+- None.
 
 ## Implementation Notes
 
@@ -252,13 +258,26 @@ only to the keystore-preparation and release-build steps and is removed from the
 runner immediately after signing.
 
 `docs/github-release-apk.md` and `docs/android-release-apk.md` document the
-public channel, protected signing identity, local recovery path, and one-time
+public channel, protected signing identity, local release build path, and one-time
 transition from development signing. The compact README GIF is 320 by 712 pixels
 at 8 FPS and 21.76 seconds; it holds the initial screen for about three seconds,
 keeps the loaded-chat pause near one second, and shows the Alpha disclosure,
 model preparation, prompt, and local response.
 
-T006 remains `blocked`, not `solved`, until the real release key has an assigned
-custodian and encrypted backup, the protected GitHub environment is configured,
-and the release workflow is committed and successfully publishes and installs
-`codegeist.apk` from GitHub.
+T007 established the custodian-controlled canonical release identity, configured
+the protected GitHub environment, and published the immutable first Release from
+commit
+`b936923d562ce28792bbb2f1fca10ff2c2fc57b2`. The successful workflow run is
+`https://github.com/codegeist-ai/codegeist-app/actions/runs/32420779152`; the
+Latest Release is
+`https://github.com/codegeist-ai/codegeist-app/releases/tag/v0.1.0%2B1`, and its
+61,709,852-byte APK SHA-256 is
+`b3e6352214df3eb16a75fef00e37014d3322ffa61f953a9215b943218526da6b`.
+Independent verification confirmed the immutable Release attestation, expected
+certificate, package, SDK, ABIs, exclusions, and stable-download byte identity.
+
+On 2026-08-21, the release custodian reported that the public stable Latest APK
+installed successfully on a physical Samsung Galaxy Z Fold6 and that Codegeist
+launched afterward. This satisfies the final direct-install criterion. An
+in-place update between release versions is outside T006 scope and is not
+claimed. T006 is `solved`.

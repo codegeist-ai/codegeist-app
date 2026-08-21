@@ -12,12 +12,16 @@ implementation tasks.
 
 - `README.md` - current application boundary, toolchain, build, and AVD usage.
 - `LICENSE` - 0BSD terms for Codegeist-authored repository content.
+- `.dockerignore` - machine-local credentials excluded from Docker build
+  contexts.
 - `.gitignore` - machine-local workspace files excluded from Git.
 - `.gitmodules` - shared-kit sources and release-branch tracking.
 - `.devcontainer/` - shared development environment on its `release` branch.
 - `.opencode/` - shared OpenCode agent kit on its `release` branch.
 - `.codegeist/Dockerfile` - pinned Flutter, JDK, Android SDK, and scrcpy
   extension for the shared devcontainer image.
+- `.codegeist/secrets/` - ignored machine-local staging for the existing Android
+  release identity; never add its contents to Git.
 - `.github/workflows/android-release-apk.yml` - manually signs and publishes the
   current universal release APK at one stable direct-download URL.
 - `Taskfile.yml` - named Flutter verification, local signed release APK, and
@@ -38,7 +42,7 @@ implementation tasks.
   smoke-test recording's meaningful launch frames.
 - `docs/github-release-apk.md` - protected GitHub release build, direct download,
   verification, sideload, and stable-update contract.
-- `docs/android-release-apk.md` - local release-key generation, signing,
+- `docs/android-release-apk.md` - local release-key custody, signing,
   verification, installation, and stable direct-update contract.
 - `docs/tasks/` - scoped application task specifications and their template.
 
@@ -72,6 +76,8 @@ implementation tasks.
 - Review
   `docs/tasks/T006_distribute_android_apks_directly.md` for protected GitHub and
   local release signing, direct APK distribution, and the Alpha disclosure.
+- Review `docs/tasks/T007_publish_first_github_release.md` for first-release
+  preflight, publication, and independent APK provenance verification.
 
 ## Update Triggers
 

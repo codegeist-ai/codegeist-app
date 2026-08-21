@@ -1,0 +1,3 @@
+# Exclude machine-local credentials from Docker build contexts.
+.codegeist/.local.env
+.codegeist/secrets/

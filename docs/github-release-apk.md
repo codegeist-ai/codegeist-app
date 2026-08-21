@@ -29,6 +29,19 @@ Repository or organization Actions policy must also allow the workflow's
 job-scoped `GITHUB_TOKEN` to receive `contents: write`; that permission is used
 only by the publication job to create the versioned Release, tag, and APK asset.
 
+An authorized repository administrator can enable and verify immutable Releases
+through GitHub's repository endpoint:
+
+```bash
+gh api --method PUT \
+  repos/codegeist-ai/codegeist-app/immutable-releases \
+  --silent
+test "$(
+  gh api repos/codegeist-ai/codegeist-app/immutable-releases \
+    --jq '.enabled'
+)" = true
+```
+
 Configure these encrypted environment secrets:
 
 - `ANDROID_RELEASE_KEYSTORE_BASE64`
@@ -40,8 +53,13 @@ Configure `ANDROID_RELEASE_CERT_SHA256` as an environment variable. The
 certificate fingerprint is public and lets the workflow reject a valid APK
 signed by an unexpected key.
 
-GitHub limits individual secret values to 48 KB. The Base64-encoded JKS generated
-from [`android-release-apk.md`](android-release-apk.md) must stay below that
+The canonical certificate SHA-256 is
+`2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4`. Treat this
+tracked public value as the independent trust root when checking the staged JKS,
+environment variable, workflow output, and downloaded APK.
+
+GitHub limits individual secret values to 48 KB. The Base64-encoded JKS staged
+through [`android-release-apk.md`](android-release-apk.md) must stay below that
 limit; Base64 expands the raw file by roughly one third. Base64 is only transport
 encoding, so the encoded keystore remains private signing material.
 
@@ -52,15 +70,43 @@ into chat or tracked files.
 
 ## Configure Signing Values
 
-Verify GitHub CLI authentication, then send the keystore to the protected
-environment without placing its bytes in shell history:
+The existing canonical identity is staged under the repository's ignored
+`.codegeist/secrets/` directory. The directory must use mode `0700`; the JKS,
+password, alias, and fingerprint files must be non-empty and use mode `0600`.
+Verify the ignore and file contracts before reading any value:
 
 ```bash
+set -euo pipefail
+secrets_dir="$PWD/.codegeist/secrets"
+test "$(stat -c '%a' "$secrets_dir")" = 700
+for file in \
+  codegeist-release.jks \
+  keystore-password \
+  key-password \
+  key-alias \
+  certificate-sha256; do
+  test -s "$secrets_dir/$file"
+  test "$(stat -c '%a' "$secrets_dir/$file")" = 600
+  git check-ignore -q "$secrets_dir/$file"
+done
+
+canonical_fingerprint=2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4
+staged_fingerprint="$(< "$secrets_dir/certificate-sha256")"
+staged_fingerprint="${staged_fingerprint//:/}"
+[[ "${staged_fingerprint^^}" == "$canonical_fingerprint" ]]
+```
+
+Verify GitHub CLI authentication, then send the keystore to the protected
+environment without placing its bytes in shell history or command arguments:
+
+```bash
+set -euo pipefail
 gh auth status --hostname github.com
 (
   set -euo pipefail
+  secrets_dir="$PWD/.codegeist/secrets"
   encoded_keystore="$(
-    base64 -w 0 "$HOME/.config/codegeist/codegeist-release.jks"
+    base64 -w 0 "$secrets_dir/codegeist-release.jks"
   )"
   test -n "$encoded_keystore"
   (( ${#encoded_keystore} <= 49152 ))
@@ -71,43 +117,35 @@ gh auth status --hostname github.com
 )
 ```
 
-Read each password without terminal echo and pass it directly to GitHub CLI:
+Send the existing passwords and alias directly from their local files. GitHub
+CLI encrypts each secret before upload:
 
 ```bash
-(
-  set -euo pipefail
-  secret=''
-  trap 'unset secret' EXIT
-
-  read -r -s -p 'Keystore password: ' secret
-  printf '\n'
-  printf '%s' "$secret" |
-    gh secret set ANDROID_RELEASE_KEYSTORE_PASSWORD \
-      --repo codegeist-ai/codegeist-app \
-      --env release
-
-  read -r -s -p 'Key password: ' secret
-  printf '\n'
-  printf '%s' "$secret" |
-    gh secret set ANDROID_RELEASE_KEY_PASSWORD \
-      --repo codegeist-ai/codegeist-app \
-      --env release
-
-  printf '%s' release |
-    gh secret set ANDROID_RELEASE_KEY_ALIAS \
-      --repo codegeist-ai/codegeist-app \
-      --env release
-)
+set -euo pipefail
+secrets_dir="$PWD/.codegeist/secrets"
+gh secret set ANDROID_RELEASE_KEYSTORE_PASSWORD \
+  --repo codegeist-ai/codegeist-app \
+  --env release < "$secrets_dir/keystore-password"
+gh secret set ANDROID_RELEASE_KEY_PASSWORD \
+  --repo codegeist-ai/codegeist-app \
+  --env release < "$secrets_dir/key-password"
+gh secret set ANDROID_RELEASE_KEY_ALIAS \
+  --repo codegeist-ai/codegeist-app \
+  --env release < "$secrets_dir/key-alias"
 ```
 
-Read the SHA-256 fingerprint with the `keytool -list -v` command documented in
-[`android-release-apk.md`](android-release-apk.md), then store that public value:
+Store the verified public SHA-256 fingerprint as an environment variable:
 
 ```bash
+set -euo pipefail
+secrets_dir="$PWD/.codegeist/secrets"
+canonical_fingerprint=2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4
+staged_fingerprint="$(< "$secrets_dir/certificate-sha256")"
+staged_fingerprint="${staged_fingerprint//:/}"
+[[ "${staged_fingerprint^^}" == "$canonical_fingerprint" ]]
 gh variable set ANDROID_RELEASE_CERT_SHA256 \
   --repo codegeist-ai/codegeist-app \
-  --env release \
-  --body '<SHA-256 certificate fingerprint>'
+  --env release < "$secrets_dir/certificate-sha256"
 ```
 
 Do not run these commands with placeholder signing values. Verify the configured
@@ -148,11 +186,27 @@ higher build number instead of attempting to overwrite its asset.
 Inside the project devcontainer, verify the downloaded file before installation:
 
 ```bash
+set -euo pipefail
+tag=v0.1.0+1
 apk=/path/to/codegeist.apk
 test -s "$apk"
 sha256sum "$apk"
-"$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
-  verify --verbose --print-certs "$apk"
+gh release verify "$tag" --repo codegeist-ai/codegeist-app
+gh release verify-asset "$tag" "$apk" \
+  --repo codegeist-ai/codegeist-app
+verification="$(
+  "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" \
+    verify --verbose --print-certs "$apk"
+)"
+printf '%s\n' "$verification"
+rg -qx 'Number of signers: 1' <<< "$verification"
+certificate_line="$(
+  rg -m1 '^Signer #1 certificate SHA-256 digest: ' <<< "$verification"
+)"
+actual_fingerprint="${certificate_line##*: }"
+actual_fingerprint="${actual_fingerprint//:/}"
+canonical_fingerprint=2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4
+[[ "${actual_fingerprint^^}" == "$canonical_fingerprint" ]]
 badging="$(
   "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$apk"
 )"
@@ -163,11 +217,13 @@ rg -q '^lib/arm64-v8a/' <<< "$archive_listing"
 rg -q '^lib/x86_64/' <<< "$archive_listing"
 ! rg -q '^lib/armeabi-v7a/' <<< "$archive_listing"
 ! rg -qi '\.gguf$' <<< "$archive_listing"
-! rg -qi '\.(jks|keystore)$' <<< "$archive_listing"
+! rg -qi '\.(jks|keystore|p12|pfx|pem|key)$' <<< "$archive_listing"
+! rg -qi '(^|/)(keystore-password|key-password|key-alias|certificate-sha256)$' \
+  <<< "$archive_listing"
 ```
 
-The SHA-256 must match the GitHub Release notes and the certificate must match
-the recorded Codegeist release fingerprint.
+The SHA-256 must match the immutable GitHub Release attestation and notes, and
+the certificate must match the tracked Codegeist release fingerprint.
 
 ## Install And Update
 

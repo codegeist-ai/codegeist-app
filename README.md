@@ -165,7 +165,7 @@ debug-signed build must be uninstalled once before the first release-signed
 installation. See [`docs/github-release-apk.md`](docs/github-release-apk.md) for
 the public build and download path and
 [`docs/android-release-apk.md`](docs/android-release-apk.md) for release-key
-custody, local recovery builds, and direct updates.
+custody, local release builds, and direct updates.
 
 ## Hosting
 

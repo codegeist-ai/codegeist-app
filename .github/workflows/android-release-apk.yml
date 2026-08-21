@@ -190,7 +190,12 @@ jobs:
             printf '%s\n' 'Model weights must not be packaged in the release APK' >&2
             exit 1
           fi
-          if grep -Eqi '\.(jks|keystore)$' <<< "$archive_listing"; then
+          if grep -Eqi '\.(jks|keystore|p12|pfx|pem|key)$' <<< "$archive_listing"; then
+            printf '%s\n' 'Signing material must not be packaged in the release APK' >&2
+            exit 1
+          fi
+          if grep -Eqi '(^|/)(keystore-password|key-password|key-alias|certificate-sha256)$' \
+            <<< "$archive_listing"; then
             printf '%s\n' 'Signing material must not be packaged in the release APK' >&2
             exit 1
           fi

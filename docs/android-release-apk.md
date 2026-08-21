@@ -1,17 +1,21 @@
 # Android Release APK
 
 Runbook for maintaining the Codegeist signing identity and building a stable APK
-locally when the GitHub release workflow needs independent verification or
-recovery.
+locally for independent verification and direct updates.
 
 ## Boundary
 
-The canonical release key is generated and backed up on a trusted local machine.
-An encrypted GitHub `release` environment copy lets
+The first canonical release key was established under T007 and its current
+credentials are staged under the ignored `.codegeist/secrets/` directory on a
+trusted local machine. An encrypted GitHub `release` environment copy lets
 `.github/workflows/android-release-apk.yml` publish the current APK; the key and
 passwords must never enter Git, workflow text, logs, chat, issues, or public
 artifacts. The same release key must sign every later direct-install update for
 Android to accept an in-place upgrade.
+
+The repository-root `.dockerignore` excludes `.codegeist/secrets/` from Docker
+build contexts. The opened workspace and devcontainer can still read the mounted
+directory, so use only trusted local tooling while the signing files are present.
 
 The APK requires Android 13 (API 33) or newer and contains `arm64-v8a` and
 `x86_64` native code but no GGUF model weights. The first model load still
@@ -23,43 +27,71 @@ downloads and verifies the pinned model.
 - Installed name: `Codegeist`
 - Version source: `pubspec.yaml`
 - APK output: `build/app/outputs/flutter-apk/app-release.apk`
+- Certificate SHA-256:
+  `2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4`
 
 Increment the `pubspec.yaml` build number for every distributed update. Android
 rejects an update with a lower version code even when its signature matches.
 
-## Create The Release Key
+## Stage The Release Key
 
-Generate the real release key interactively outside the checkout. `keytool`
-prompts for passwords instead of placing them in shell history:
+Reuse the canonical JKS, passwords, and alias established for the first public
+Release. Do not generate a new key or rotate its credentials during later
+release setup. The repository-root `.gitignore` excludes
+`.codegeist/secrets/`; verify that rule before staging any value:
 
 ```bash
-install -d -m 0700 "$HOME/.config/codegeist"
-keytool -genkeypair -v \
-  -keystore "$HOME/.config/codegeist/codegeist-release.jks" \
-  -storetype JKS \
-  -keyalg RSA \
-  -keysize 4096 \
-  -validity 10000 \
-  -alias release
-chmod 0600 "$HOME/.config/codegeist/codegeist-release.jks"
+set -euo pipefail
+git check-ignore -q .codegeist/secrets/credential-probe
+install -d -m 0700 .codegeist/secrets
 ```
 
-Inspect and export the public certificate for recovery records:
+Stage these non-empty files with mode `0600`:
+
+- `.codegeist/secrets/codegeist-release.jks`
+- `.codegeist/secrets/keystore-password`
+- `.codegeist/secrets/key-password`
+- `.codegeist/secrets/key-alias`
+- `.codegeist/secrets/certificate-sha256`
+- `.codegeist/secrets/codegeist-release-certificate.pem`
+
+Verify the local boundary without printing a credential:
 
 ```bash
+set -euo pipefail
+secrets_dir="$PWD/.codegeist/secrets"
+test "$(stat -c '%a' "$secrets_dir")" = 700
+for file in \
+  codegeist-release.jks \
+  keystore-password \
+  key-password \
+  key-alias \
+  certificate-sha256 \
+  codegeist-release-certificate.pem; do
+  test -s "$secrets_dir/$file"
+  test "$(stat -c '%a' "$secrets_dir/$file")" = 600
+  git check-ignore -q "$secrets_dir/$file"
+done
+
+canonical_fingerprint=2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4
+staged_fingerprint="$(< "$secrets_dir/certificate-sha256")"
+staged_fingerprint="${staged_fingerprint//:/}"
+[[ "${staged_fingerprint^^}" == "$canonical_fingerprint" ]]
+
+export ANDROID_RELEASE_KEYSTORE_PASSWORD="$(
+  < "$secrets_dir/keystore-password"
+)"
+export ANDROID_RELEASE_KEY_ALIAS="$(< "$secrets_dir/key-alias")"
 keytool -list -v \
-  -keystore "$HOME/.config/codegeist/codegeist-release.jks" \
-  -alias release
-keytool -exportcert -rfc \
-  -keystore "$HOME/.config/codegeist/codegeist-release.jks" \
-  -alias release \
-  -file "$HOME/.config/codegeist/codegeist-release-certificate.pem"
+  -keystore "$secrets_dir/codegeist-release.jks" \
+  -alias "$ANDROID_RELEASE_KEY_ALIAS" \
+  -storepass:env ANDROID_RELEASE_KEYSTORE_PASSWORD
+unset ANDROID_RELEASE_KEYSTORE_PASSWORD ANDROID_RELEASE_KEY_ALIAS
 ```
 
-Back up the keystore, both passwords, alias, certificate, and SHA-256
-fingerprint in approved encrypted storage before placing the encrypted values
-in GitHub or distributing the first APK. Losing the private key makes future
-in-place updates impossible; exposing it requires replacing the
+These six files are the sole local custody copy of the signing identity. GitHub
+environment secrets cannot be read back as a replacement. Losing the private
+key makes future in-place updates impossible; exposing it requires replacing the
 direct-distribution identity and reinstalling the app.
 
 ## Build Locally
@@ -68,31 +100,43 @@ Run from the repository root inside the rebuilt project devcontainer. Build only
 from the intended committed source; `git status --short` must produce no output:
 
 ```bash
-git status --short
+set -euo pipefail
+test -z "$(git status --short)"
 git rev-parse HEAD
 task verify
 ```
 
-Set the non-secret path and alias, then read passwords without terminal echo or
-shell-history arguments:
+Load the existing local values into the release-build environment without
+printing them or placing them in command arguments:
 
 ```bash
-export ANDROID_RELEASE_KEYSTORE_PATH="$HOME/.config/codegeist/codegeist-release.jks"
-export ANDROID_RELEASE_KEY_ALIAS=release
-export ANDROID_RELEASE_CERT_SHA256='<recorded SHA-256 certificate fingerprint>'
+set -euo pipefail
+secrets_dir="$PWD/.codegeist/secrets"
+canonical_fingerprint=2A0789CB791AAD8E139E583DA856D121975C74CD14F403EF0E890E6ABC20EDD4
+export ANDROID_RELEASE_KEYSTORE_PATH="$secrets_dir/codegeist-release.jks"
+export ANDROID_RELEASE_KEYSTORE_PASSWORD="$(
+  < "$secrets_dir/keystore-password"
+)"
+export ANDROID_RELEASE_KEY_PASSWORD="$(< "$secrets_dir/key-password")"
+export ANDROID_RELEASE_KEY_ALIAS="$(< "$secrets_dir/key-alias")"
+export ANDROID_RELEASE_CERT_SHA256="$(< "$secrets_dir/certificate-sha256")"
+configured_fingerprint="${ANDROID_RELEASE_CERT_SHA256//:/}"
+[[ "${configured_fingerprint^^}" == "$canonical_fingerprint" ]]
 
-read -r -s -p 'Keystore password: ' ANDROID_RELEASE_KEYSTORE_PASSWORD
-printf '\n'
-export ANDROID_RELEASE_KEYSTORE_PASSWORD
-
-read -r -s -p 'Key password: ' ANDROID_RELEASE_KEY_PASSWORD
-printf '\n'
-export ANDROID_RELEASE_KEY_PASSWORD
+cleanup_release_env() {
+  unset ANDROID_RELEASE_KEYSTORE_PATH
+  unset ANDROID_RELEASE_KEYSTORE_PASSWORD
+  unset ANDROID_RELEASE_KEY_PASSWORD
+  unset ANDROID_RELEASE_KEY_ALIAS
+  unset ANDROID_RELEASE_CERT_SHA256
+}
+trap cleanup_release_env EXIT INT TERM
 ```
 
 Build and verify the universal release APK:
 
 ```bash
+set -euo pipefail
 task apk
 
 apk=build/app/outputs/flutter-apk/app-release.apk
@@ -108,8 +152,7 @@ certificate_line="$(
 )"
 actual_fingerprint="${certificate_line##*: }"
 actual_fingerprint="${actual_fingerprint//:/}"
-expected_fingerprint="${ANDROID_RELEASE_CERT_SHA256//:/}"
-[[ "${actual_fingerprint,,}" == "${expected_fingerprint,,}" ]]
+[[ "${actual_fingerprint^^}" == "$canonical_fingerprint" ]]
 
 badging="$(
   "$ANDROID_SDK_ROOT/build-tools/36.0.0/aapt" dump badging "$apk"
@@ -122,23 +165,27 @@ rg -q '^lib/arm64-v8a/' <<< "$archive_listing"
 rg -q '^lib/x86_64/' <<< "$archive_listing"
 ! rg -q '^lib/armeabi-v7a/' <<< "$archive_listing"
 ! rg -qi '\.gguf$' <<< "$archive_listing"
-! rg -qi '\.(jks|keystore)$' <<< "$archive_listing"
+! rg -qi '\.(jks|keystore|p12|pfx|pem|key)$' <<< "$archive_listing"
+! rg -qi '(^|/)(keystore-password|key-password|key-alias|certificate-sha256)$' \
+  <<< "$archive_listing"
 sha256sum "$apk"
 ```
 
 Verification must report a valid signature, the intended release certificate,
 and minimum SDK 33. The archive must contain both supported ABIs and no
-`lib/armeabi-v7a/`, `.gguf`, or keystore.
+`lib/armeabi-v7a/`, `.gguf`, signing material, or credential staging file.
 
 After the build, remove signing values from the shell environment:
 
 ```bash
-unset ANDROID_RELEASE_KEYSTORE_PATH
-unset ANDROID_RELEASE_KEYSTORE_PASSWORD
-unset ANDROID_RELEASE_KEY_PASSWORD
-unset ANDROID_RELEASE_KEY_ALIAS
-unset ANDROID_RELEASE_CERT_SHA256
+cleanup_release_env
+trap - EXIT INT TERM
+unset -f cleanup_release_env
 ```
+
+The ignored local files remain under custodian control after the shell values
+are unset. Keep all six signing-identity files under `.codegeist/secrets/` with
+their restrictive modes.
 
 ## Install And Update
 
